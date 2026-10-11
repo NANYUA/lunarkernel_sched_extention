@@ -517,6 +517,12 @@ static void lse_irq_work(struct irq_work *irq_work)
 	    	lse_update_task_ravg(lts, rq->curr, rq, TASK_UPDATE, wc);
 	}
 
+	/*
+	 * cpu_rq(0) 已在上面的循环中被加锁,但其 rq->clock 尚未更新;
+	 * cpufreq_update_util() 内部会读取 rq_clock(rq),若不先 update_rq_clock
+	 * 会触发 assert_clock_updated 的 WARNING。此处补一次时钟更新。
+	 */
+	update_rq_clock(cpu_rq(0));
 	cpufreq_update_util(cpu_rq(0), LSE_CPUFREQ_WINDOW_ROLLOVER);
 	spin_lock_irqsave(&new_sched_ravg_window_lock, flags);
 	if (unlikely(new_lse_sched_ravg_window != lse_sched_ravg_window)) {
