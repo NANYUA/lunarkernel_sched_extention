@@ -57,11 +57,9 @@ struct ctl_table lse_table[] = {
         .data         = &slim_walt_ctrl,
         .maxlen       = sizeof(int),
         .mode         = 0644,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-        .proc_handler = proc_dobool,
-#else
-        .proc_handler = proc_dointvec,
-#endif
+        .proc_handler = proc_dointvec_minmax,
+        .extra1       = SYSCTL_ZERO,
+        .extra2       = SYSCTL_ONE,
     },
     {
         .procname     = "slim_walt_policy",
