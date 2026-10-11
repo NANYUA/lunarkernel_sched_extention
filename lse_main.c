@@ -21,7 +21,8 @@
 
 bool lse_clock_suspended;
 u64 lse_clock_last;
-unsigned int dump_info = LSE_DEBUG_PANIC;
+/* built-in 安全:默认用 PRINTK 而非 PANIC,内部断言只打印不致命 */
+unsigned int dump_info = LSE_DEBUG_PRINTK;
 
 noinline int lse_tracing_mark_write(const char *buf)
 {
