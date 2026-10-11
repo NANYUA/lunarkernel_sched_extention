@@ -16,7 +16,7 @@
 
 #include "lse_main.h"
 
-int slim_walt_ctrl = 1;
+int lse_slim_walt_ctrl = 1;
 int frame_per_sec = 120;
 
 static int window_stats_policy_minval = WINDOW_STATS_RECENT;
@@ -44,7 +44,7 @@ static int lse_proc_sched_ravg_window_update(struct ctl_table *table,
 		goto unlock;
 	frame_per_sec = val;
 
-	sched_ravg_window_change(frame_per_sec);
+	lse_sched_ravg_window_change(frame_per_sec);
 
 unlock:
 	mutex_unlock(&mutex);
@@ -54,7 +54,7 @@ unlock:
 struct ctl_table lse_table[] = {
     {
         .procname     = "slim_walt_ctrl",
-        .data         = &slim_walt_ctrl,
+        .data         = &lse_slim_walt_ctrl,
         .maxlen       = sizeof(int),
         .mode         = 0644,
         .proc_handler = proc_dointvec_minmax,

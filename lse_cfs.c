@@ -45,7 +45,7 @@ void lse_scheduler_tick(void)
 	int cpu = smp_processor_id();
 	struct rq *rq = cpu_rq(cpu);
 
-	if (!slim_walt_ctrl)
+	if (!lse_slim_walt_ctrl)
 		return;
 
 	if (unlikely(!tick_sched_clock)) {
@@ -84,7 +84,7 @@ static void lse_schedule(void *unused, struct task_struct *prev, struct task_str
 {
 	struct lse_task_struct *prev_lts, *next_lts;
 
-	if (!slim_walt_ctrl)
+	if (!lse_slim_walt_ctrl)
 		return;
 
 	prev_lts = get_lse_task_struct(prev);
@@ -104,7 +104,7 @@ void lse_tick_entry(void *unused, struct rq *rq)
 {
 	struct lse_task_struct *curr_lts;
 
-	if (!slim_walt_ctrl)
+	if (!lse_slim_walt_ctrl)
 		return;
 
 	curr_lts = get_lse_task_struct(rq->curr);

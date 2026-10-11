@@ -45,7 +45,7 @@ static inline void cpu_util_update_systrace_c(int cpu)
 unsigned int __read_mostly lse_sched_ravg_window = DEFAULT_SCHED_RAVG_WINDOW;
 EXPORT_SYMBOL_GPL(lse_sched_ravg_window);
 __read_mostly unsigned int new_lse_sched_ravg_window = DEFAULT_SCHED_RAVG_WINDOW;
-DEFINE_SPINLOCK(new_sched_ravg_window_lock);
+DEFINE_SPINLOCK(lse_new_sched_ravg_window_lock);
 DEFINE_PER_CPU(struct lse_rq, lse_rq);
 EXPORT_PER_CPU_SYMBOL_GPL(lse_rq);
 
@@ -436,7 +436,7 @@ void lse_update_task_ravg(struct lse_task_struct *lts, struct task_struct *p, st
 	struct lse_rq *lrq = &per_cpu(lse_rq, cpu_of(rq));
 	u64 old_window_start;
 
-	if(!slim_walt_ctrl)
+	if(!lse_slim_walt_ctrl)
 		return;
 
 	if(!lrq->window_start || lts->mark_start == wallclock)
@@ -518,19 +518,20 @@ static void lse_irq_work(struct irq_work *irq_work)
 	}
 
 	/*
-	 * cpu_rq(0) 已在上面的循环中被加锁,但其 rq->clock 尚未更新;
+	 * cpu_rq(0) 已在上面的循环中被加锁,但其 rq->clock 可能尚未更新;
 	 * cpufreq_update_util() 内部会读取 rq_clock(rq),若不先 update_rq_clock
-	 * 会触发 assert_clock_updated 的 WARNING。此处补一次时钟更新。
+	 * 会触发 assert_clock_updated 的 WARNING。此处按需补一次时钟更新。
 	 */
-	update_rq_clock(cpu_rq(0));
+	if (!(cpu_rq(0)->clock_update_flags & RQCF_UPDATED))
+		update_rq_clock(cpu_rq(0));
 	cpufreq_update_util(cpu_rq(0), LSE_CPUFREQ_WINDOW_ROLLOVER);
-	spin_lock_irqsave(&new_sched_ravg_window_lock, flags);
+	spin_lock_irqsave(&lse_new_sched_ravg_window_lock, flags);
 	if (unlikely(new_lse_sched_ravg_window != lse_sched_ravg_window)) {
 		lrq = &per_cpu(lse_rq, smp_processor_id());
 		if (wc < lrq->window_start + new_lse_sched_ravg_window)
 			lse_sched_ravg_window = new_lse_sched_ravg_window;
 	}
-	spin_unlock_irqrestore(&new_sched_ravg_window_lock, flags);
+	spin_unlock_irqrestore(&lse_new_sched_ravg_window_lock, flags);
 
 	for_each_cpu(cpu, &lock_cpus)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
@@ -588,11 +589,11 @@ void lse_sched_stats_init(void)
 	}
 }
 
-void sched_ravg_window_change(int frame_per_sec)
+void lse_sched_ravg_window_change(int frame_per_sec)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&new_sched_ravg_window_lock, flags);
+	spin_lock_irqsave(&lse_new_sched_ravg_window_lock, flags);
 	new_lse_sched_ravg_window = NSEC_PER_SEC / frame_per_sec;
-	spin_unlock_irqrestore(&new_sched_ravg_window_lock, flags);
+	spin_unlock_irqrestore(&lse_new_sched_ravg_window_lock, flags);
 }

@@ -151,7 +151,7 @@ extern void lse_sched_cluster_init(void);
 
 
 /* lse_sysctl.c */
-extern int slim_walt_ctrl;
+extern int lse_slim_walt_ctrl;
 extern int frame_per_sec;
 extern void lse_sysctl_init(void);
 
@@ -162,11 +162,11 @@ extern u64 tick_sched_clock;
 extern unsigned int lse_sched_ravg_window;
 extern unsigned int new_lse_sched_ravg_window;
 extern unsigned int lse_scale_demand_divisor;
-extern spinlock_t new_sched_ravg_window_lock;
+extern spinlock_t lse_new_sched_ravg_window_lock;
 extern void lse_update_task_ravg(struct lse_task_struct *lts, struct task_struct *p, struct rq *rq, int event, u64 wallclock);
 extern u16 lse_cpu_util(int cpu);
 extern void lse_sched_stats_init(void);
-extern void sched_ravg_window_change(int frame_per_sec);
+extern void lse_sched_ravg_window_change(int frame_per_sec);
 
 /*util = runtime * 1024 / window_size */
 static inline u64 lse_scale_time_to_util(u64 d)
