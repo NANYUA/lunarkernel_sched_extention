@@ -752,6 +752,7 @@ struct cpufreq_governor cpufreq_lse_gov = {
  * 这里延迟后从内核侧把各 cpufreq policy 的 scaling_governor 写成本调速器。
  * 延迟执行(等 cpufreq policy / LSE 其余初始化就绪),失败无害、可重试。
  */
+#ifndef MODULE	/* 仅 built-in 需要;模块由开机脚本设置调速器,避免 VFS filp_open 命名空间依赖 */
 static struct delayed_work lse_autostart_work;
 static int lse_autostart_tries;
 
@@ -802,6 +803,7 @@ static void lse_autostart_fn(struct work_struct *work)
 	else
 		lse_gov_debug("autostart done after %d tries\n", lse_autostart_tries);
 }
+#endif /* !MODULE */
 
 int lse_cpufreq_init(void)
 {
@@ -818,8 +820,10 @@ int lse_cpufreq_init(void)
 			arch_scale_cpu_capacity(cpumask_first(&cluster->cpus)),
 			num_possible_cpus());
 
+#ifndef MODULE
 	INIT_DELAYED_WORK(&lse_autostart_work, lse_autostart_fn);
 	schedule_delayed_work(&lse_autostart_work, msecs_to_jiffies(5000));
+#endif
 
 	return ret;
 }
