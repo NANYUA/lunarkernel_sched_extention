@@ -16,6 +16,8 @@
 #include <linux/sched.h>
 #include <linux/sched/cputime.h>
 #include <uapi/linux/sched/types.h>
+#include <linux/fs.h>
+#include <linux/workqueue.h>
 #include <trace/hooks/sched.h>
 
 #include "lse_main.h"
@@ -745,6 +747,62 @@ struct cpufreq_governor cpufreq_lse_gov = {
 	.limits			= lse_gov_limits,
 };
 
+/*
+ * 开机零脚本自动选中:built-in 时,内核默认调速器不是 lunar_ext_gov,
+ * 这里延迟后从内核侧把各 cpufreq policy 的 scaling_governor 写成本调速器。
+ * 延迟执行(等 cpufreq policy / LSE 其余初始化就绪),失败无害、可重试。
+ */
+static struct delayed_work lse_autostart_work;
+static int lse_autostart_tries;
+
+static void lse_write_governor(unsigned int cpu)
+{
+	struct file *filp;
+	char path[96];
+	loff_t pos = 0;
+	static const char gov[] = "lunar_ext_gov\n";
+
+	snprintf(path, sizeof(path),
+		 "/sys/devices/system/cpu/cpufreq/policy%u/scaling_governor", cpu);
+	filp = filp_open(path, O_WRONLY, 0);
+	if (IS_ERR(filp))
+		return;
+	kernel_write(filp, gov, sizeof(gov) - 1, &pos);
+	filp_close(filp, NULL);
+}
+
+static void lse_autostart_fn(struct work_struct *work)
+{
+	struct cpufreq_policy *policy;
+	unsigned int cpu;
+	bool all_ok = true;
+	bool any_policy = false;
+
+	for_each_possible_cpu(cpu) {
+		policy = cpufreq_cpu_get(cpu);
+		if (!policy)
+			continue;
+		any_policy = true;
+		if (policy->governor != &cpufreq_lse_gov) {
+			unsigned int first = cpumask_first(policy->related_cpus);
+
+			all_ok = false;
+			cpufreq_cpu_put(policy);
+			lse_write_governor(first);
+			continue;
+		}
+		cpufreq_cpu_put(policy);
+	}
+
+	if (!any_policy)
+		all_ok = false;
+
+	if (!all_ok && lse_autostart_tries++ < 60)
+		schedule_delayed_work(&lse_autostart_work, msecs_to_jiffies(2000));
+	else
+		lse_gov_debug("autostart done after %d tries\n", lse_autostart_tries);
+}
+
 int lse_cpufreq_init(void)
 {
 	int ret = 0;
@@ -759,6 +817,9 @@ int lse_cpufreq_init(void)
 			lse_num_sched_clusters, cluster->id, cpumask_pr_args(&cluster->cpus),
 			arch_scale_cpu_capacity(cpumask_first(&cluster->cpus)),
 			num_possible_cpus());
+
+	INIT_DELAYED_WORK(&lse_autostart_work, lse_autostart_fn);
+	schedule_delayed_work(&lse_autostart_work, msecs_to_jiffies(5000));
 
 	return ret;
 }
